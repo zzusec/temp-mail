@@ -30,7 +30,7 @@
    C. 配置环境变量
       在 Worker 设置中添加以下变量：
       - JWT_KEY: 您的 API 访问密钥（用于鉴权）。
-      - domain: 您的邮箱域名后缀（例如 hx10.com）。
+      - domain: 您的邮箱域名后缀（例如 taobao.com）。
 
    D. 配置 Email Routing
       在 Cloudflare 域名设置中开启 Email Routing，并将 Catch-all 或指定地址转发到此 Worker。
