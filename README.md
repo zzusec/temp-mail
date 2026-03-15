@@ -32,24 +32,47 @@
    pip install curl_cffi
    ```
 2. **配置 `.env` 文件**：
-   在脚本同级目录下创建 `.env` 文件，参考以下范本。**请务必将 `MAIL_DOMAIN` 设置为您的实际域名，并确保 `TEMP_MAIL_WORKER` 和 `JWT_KEY` 配置正确。**
+   在脚本同级目录下创建 `.env` 文件，用于配置脚本运行所需的环境变量。**这是确保脚本正常运行的关键步骤。**
+
+   #### `.env` 配置范本与说明
    ```env
-   # Temp Mail Worker 地址 (末尾不需要斜杠)
+   # --- Temp Mail Worker 配置 (必填) ---
+   # 您的 Cloudflare Worker 访问地址。请替换为您的 Worker 实际部署的 URL，例如：https://your-worker-name.your-username.workers.dev
+   # 注意：末尾不需要斜杠。
    TEMP_MAIL_WORKER=https://your-worker.workers.dev
-   # API 访问密钥 (与 Worker 中的 JWT_KEY 一致)
+
+   # API 访问密钥。此密钥应与您在 Cloudflare Worker 设置中配置的 JWT_KEY 环境变量完全一致。
+   # 它是访问 Worker API 的凭证，请确保其安全性。
    JWT_KEY=admin123
-   # 您的邮箱域名后缀 (例如：hx10.com)
+
+   # 您的邮箱域名后缀。此域名应与您在 Cloudflare Worker 设置中配置的 domain 环境变量一致。
+   # 例如，如果您的 Worker 处理的是 @hx10.com 的邮件，这里就填写 hx10.com。
+   # 脚本将使用此域名来生成临时邮箱，例如：john.doe@yourdomain.com
    MAIL_DOMAIN=yourdomain.com
    
-   # 可选配置
+   # --- OpenAI 注册可选配置 ---
+   # 是否验证 SSL 证书。设置为 1 表示开启 SSL 验证，0 表示关闭。
+   # 在某些特殊网络环境下，如果遇到 SSL 错误，可以尝试设置为 0，但请注意这会降低安全性。
    OPENAI_SSL_VERIFY=1
+
+   # 是否跳过网络环境检查。设置为 1 表示跳过，0 表示进行检查。
+   # 如果您的代理不够稳定导致脚本启动时的网络检查失败，可以设置为 1 来跳过此检查。
    SKIP_NET_CHECK=0
+
+   # Token 文件保存目录。脚本成功注册账号后，生成的 token 将保存到此目录下。
+   # 默认为脚本所在目录下的 ./tokens 文件夹。
    TOKEN_OUTPUT_DIR=./tokens
    ```
+
+   **如何获取 `TEMP_MAIL_WORKER` 和 `JWT_KEY`、`MAIL_DOMAIN`：**
+   - `TEMP_MAIL_WORKER`：部署 Worker 后，在 Cloudflare Worker 概览页面可以看到 Worker 的 URL。
+   - `JWT_KEY` 和 `MAIL_DOMAIN`：在 Cloudflare Worker 的 **“设置”** -> **“变量”** 中，您会找到这两个环境变量的配置值。
+
 3. **运行脚本**：
    ```bash
    python openai_regst_auto.py --proxy http://your-proxy-address
    ```
+   （`--proxy` 参数是可选的，如果您的网络环境需要代理才能访问 OpenAI，请提供您的代理地址。）
 
 ## 🛠️ 部署步骤
 
@@ -140,5 +163,5 @@ CREATE TABLE IF NOT EXISTS mails (
 
 **Author**: [zzusec](https://github.com/zzusec)
 **Reference**: [mail-curl](https://github.com/s12ryt/mail-curl)
-**Version**: 1.2.0
+**Version**: 1.3.0
 **Date**: 2026-03-15
