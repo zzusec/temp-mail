@@ -22,12 +22,6 @@ import urllib.request
 import urllib.error
 from curl_cffi import requests
 
-# ==========================================
-# Cloudflare Temp Email API (Integrated)
-# ==========================================
-
-# 请在此处配置您的 Worker 地址和 JWT_KEY
-# 也可以通过环境变量 TEMP_MAIL_WORKER 和 JWT_KEY 设置
 def _load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
         return
@@ -42,7 +36,7 @@ def _load_dotenv(path: str = ".env") -> None:
                 if not key or key in os.environ:
                     continue
                 value = value.strip()
-                if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\"", "\""}:
                     value = value[1:-1]
                 os.environ[key] = value
     except Exception:
@@ -50,24 +44,18 @@ def _load_dotenv(path: str = ".env") -> None:
 
 _load_dotenv()
 
-TEMP_MAIL_WORKER = os.getenv("TEMP_MAIL_WORKER").rstrip("/") if os.getenv("TEMP_MAIL_WORKER") else "https://your-worker.workers.dev"
-JWT_KEY = os.getenv("JWT_KEY") if os.getenv("JWT_KEY") else "admin123"
+# ==========================================
+# Cloudflare Temp Email API (Integrated)
+# ==========================================
 
-# 自动从 index.js 或环境变量获取域名
+TEMP_MAIL_WORKER = os.getenv("TEMP_MAIL_WORKER", "https://your-worker.workers.dev").rstrip("/")
+JWT_KEY = os.getenv("JWT_KEY", "admin123")
+
 def get_mail_domain():
     domain = os.getenv("MAIL_DOMAIN")
     if domain:
         return domain
-    try:
-        if os.path.exists("index.js"):
-            with open("index.js", "r", encoding="utf-8") as f:
-                content = f.read()
-                # 尝试匹配 env.domain || "domain.com"
-                match = re.search(r'env\.domain\s*\|\|\s*"([^"]+)"', content)
-                if match:
-                    return match.group(1)
-    except:
-        pass
+    print("[Info] 未在 .env 中找到 MAIL_DOMAIN 配置，将使用默认域名 domain.com。建议在 .env 中设置 MAIL_DOMAIN=yourdomain.com")
     return "domain.com"
 
 MAIL_DOMAIN = get_mail_domain()
@@ -107,7 +95,6 @@ def get_email_and_token(proxies: Any = None) -> tuple:
 def _extract_otp_code(content: str) -> str:
     if not content:
         return ""
-    # 优先匹配 OpenAI 特定的验证码文案
     patterns = [
         r"enter this code:\s*(\d{6})",
         r"Your ChatGPT code is\s*(\d{6})",
@@ -118,15 +105,12 @@ def _extract_otp_code(content: str) -> str:
         match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
         if match:
             return match.group(1)
-    # 通用 6 位数字匹配
     fallback = re.search(r"(?<!\d)(\d{6})(?!\d)", content)
     return fallback.group(1) if fallback else ""
 
 def get_oai_code(mailbox_id: str, email: str, proxies: Any = None) -> str:
     """通过 Temp Mail API 轮询获取 OpenAI 验证码"""
     print(f"[*] 正在等待邮箱 {email} 的验证码...", end="", flush=True)
-    
-    # 轮询 20 次，每次间隔 5 秒，总计约 100 秒
     for _ in range(20):
         print(".", end="", flush=True)
         try:
@@ -140,7 +124,6 @@ def get_oai_code(mailbox_id: str, email: str, proxies: Any = None) -> str:
             )
             if res.status_code == 200:
                 data = res.json()
-                # API 返回最新一封邮件
                 if data and isinstance(data, dict) and data.get("id"):
                     content = str(data.get("body") or "") + str(data.get("subject") or "")
                     code = _extract_otp_code(content)
@@ -257,13 +240,13 @@ def _post_form(url: str, data: Dict[str, str], timeout: int = 30) -> Dict[str, A
             raw = resp.read()
             if resp.status != 200:
                 raise RuntimeError(
-                    f"token exchange failed: {resp.status}: {raw.decode('utf-8', 'replace')}"
+                    f"token exchange failed: {resp.status}: {raw.decode(\'utf-8\', \'replace\')}"
                 )
             return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raw = exc.read()
         raise RuntimeError(
-            f"token exchange failed: {exc.code}: {raw.decode('utf-8', 'replace')}"
+            f"token exchange failed: {exc.code}: {raw.decode(\'utf-8\', \'replace\')}"
         ) from exc
 
 def _post_with_retry(
@@ -349,7 +332,7 @@ def submit_callback_url(
     cb = _parse_callback_url(callback_url)
     if cb["error"]:
         desc = cb["error_description"]
-        raise RuntimeError(f"oauth error: {cb['error']}: {desc}".strip())
+        raise RuntimeError(f"oauth error: {cb[\'error\']}: {desc}".strip())
     if not cb["code"]:
         raise ValueError("callback url missing ?code=")
     if not cb["state"]:
@@ -431,7 +414,6 @@ def run(proxy: Optional[str]) -> tuple:
             print(f"[Error] 网络连接检查失败: {e}")
             return None, None
 
-    # 使用 Temp Mail API 获取邮箱
     email, mailbox_id = get_email_and_token(proxies)
     if not email or not mailbox_id:
         return None, None
@@ -443,8 +425,8 @@ def run(proxy: Optional[str]) -> tuple:
         resp = s.get(url, proxies=proxies, verify=True, timeout=15)
         did = s.cookies.get("oai-did")
         print(f"[*] Device ID: {did}")
-        signup_body = f'{{"username":{{"value":"{email}","kind":"email"}},"screen_hint":"signup"}}'
-        sen_req_body = f'{{"p":"","id":"{did}","flow":"authorize_continue"}}'
+        signup_body = f\'{{"username":{{"value":"{email}","kind":"email"}},"screen_hint":"signup"}}\'
+        sen_req_body = f\'{{"p":"","id":"{did}","flow":"authorize_continue"}}\'
         sen_resp = requests.post(
             "https://sentinel.openai.com/backend-api/sentinel/req",
             headers={
@@ -462,7 +444,7 @@ def run(proxy: Optional[str]) -> tuple:
             print(f"[Error] Sentinel 异常拦截，状态码: {sen_resp.status_code}")
             return None, None
         sen_token = sen_resp.json()["token"]
-        sentinel = f'{{"p": "", "t": "", "c": "{sen_token}", "id": "{did}", "flow": "authorize_continue"}}'
+        sentinel = f\'{{"p": "", "t": "", "c": "{sen_token}", "id": "{did}", "flow": "authorize_continue"}}\'
         signup_resp = s.post(
             "https://auth.openai.com/api/accounts/authorize/continue",
             headers={
@@ -485,7 +467,6 @@ def run(proxy: Optional[str]) -> tuple:
             print(signup_resp.text)
             return None, None
 
-        # --- 密码注册流程 ---
         password = _generate_password()
         register_body = json.dumps({"password": password, "username": email})
         print(f"[*] 生成随机密码: {password[:4]}****")
@@ -514,7 +495,6 @@ def run(proxy: Optional[str]) -> tuple:
             register_continue = ""
             register_page = ""
 
-        # 判断是否需要邮箱验证
         need_otp = "email-verification" in register_continue or "verify" in register_continue
         if not need_otp and register_page:
             need_otp = "verification" in register_page or "otp" in register_page
@@ -540,7 +520,6 @@ def run(proxy: Optional[str]) -> tuple:
                     retries=2,
                 )
             
-            # 自动获取验证码
             code = get_oai_code(mailbox_id, email, proxies)
             if not code:
                 print("[Error] 自动获取验证码失败，跳过")
@@ -568,7 +547,7 @@ def run(proxy: Optional[str]) -> tuple:
         else:
             print("[*] 密码注册无需邮箱验证，跳过 OTP 步骤")
 
-        create_account_body = '{"name":"Neo","birthdate":"2000-02-20"}'
+        create_account_body = \'{"name":"Neo","birthdate":"2000-02-20"}\'
         print("[*] 开始创建账户...")
         create_account_resp = _post_with_retry(
             s,
@@ -598,7 +577,7 @@ def run(proxy: Optional[str]) -> tuple:
             return None, None
         workspace_id = str((workspaces[0] or {}).get("id") or "").strip()
         
-        select_body = f'{{"workspace_id":"{workspace_id}"}}'
+        select_body = f\'{{"workspace_id":"{workspace_id}"}}\'
         print("[*] 开始选择 workspace...")
         select_resp = _post_with_retry(
             s,
@@ -664,7 +643,7 @@ def main() -> None:
 
     while True:
         count += 1
-        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] >>> 开始第 {count} 次注册流程 <<<")
+        print(f"\n[{datetime.now().strftime(\'%H:%M:%S\')}] >>> 开始第 {count} 次注册流程 <<<")
         try:
             token_json, password = run(args.proxy)
             if token_json == "retry_403":
@@ -673,7 +652,7 @@ def main() -> None:
             if token_json:
                 t_data = json.loads(token_json)
                 account_email = t_data.get("email", "")
-                file_name = f"token_{account_email.replace('@', '_')}_{int(time.time())}.json"
+                file_name = f"token_{account_email.replace(\'@\', \'_\')}_{int(time.time())}.json"
                 if TOKEN_OUTPUT_DIR:
                     os.makedirs(TOKEN_OUTPUT_DIR, exist_ok=True)
                     file_name = os.path.join(TOKEN_OUTPUT_DIR, file_name)
