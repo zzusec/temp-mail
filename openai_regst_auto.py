@@ -281,13 +281,13 @@ def _post_form(url: str, data: Dict[str, str], timeout: int = 30) -> Dict[str, A
             raw = resp.read()
             if resp.status != 200:
                 raise RuntimeError(
-                    f"token exchange failed: {resp.status}: {raw.decode(\'utf-8\', \'replace\')}"
+                    f"token exchange failed: {resp.status}: {raw.decode('utf-8', 'replace')}"
                 )
             return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raw = exc.read()
         raise RuntimeError(
-            f"token exchange failed: {exc.code}: {raw.decode(\'utf-8\', \'replace\')}"
+            f"token exchange failed: {exc.code}: {raw.decode('utf-8', 'replace')}"
         ) from exc
 
 def _post_with_retry(
