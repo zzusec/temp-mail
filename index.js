@@ -1,10 +1,12 @@
 /**
- * 临时邮箱 Worker - 动态去噪版
- * 
- * 核心修复：
+ * 临时邮箱 Worker - 动态去噪版 (支持自定义邮箱前缀)
+ *
+ * 核心特性：
  * 1. 动态感知发件人特征，自动在返回时剔除正文末尾包含的发件人姓名和邮箱。
  * 2. 优化了换行符处理，将 \r\n 统一清理。
  * 3. 增强了对多种签名档标识的截断。
+ * 4. handleRemail 函数现在支持从请求中获取自定义邮箱前缀 (prefix)。
+ * 5. 如果未提供自定义前缀，将生成类似人名的邮箱前缀。
  */
 
 export default {
@@ -19,16 +21,17 @@ export default {
             const providedKey = authHeader?.replace("Bearer ", "") || url.searchParams.get("key");
 
             if (!providedKey || providedKey !== env.JWT_KEY) {
-                return new Response(JSON.stringify({ error: "Unauthorized" }), { 
-                    status: 401, 
-                    headers: { "Content-Type": "application/json" } 
+                return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
                 });
             }
 
             try {
                 if (path === "/api/remail") {
                     const domain = url.searchParams.get("domain") || env.domain || "domain.com";
-                    return await handleRemail(env, domain);
+                    // 关键修改：将 request 对象传递给 handleRemail
+                    return await handleRemail(env, domain, request);
                 }
                 if (path === "/api/inbox") {
                     const mailboxId = url.searchParams.get("mailbox_id");
@@ -101,10 +104,10 @@ function advancedParse(rawText) {
         if (splitIndex !== -1) textContent = rawText.substring(splitIndex + 4);
     }
 
-    return { 
-        subject, 
-        text: textContent || htmlContent, 
-        html: htmlContent || textContent 
+    return {
+        subject,
+        text: textContent || htmlContent,
+        html: htmlContent || textContent
     };
 }
 
@@ -125,13 +128,13 @@ function extractPartBody(part) {
  */
 function cleanBodyDynamic(text, sender) {
     if (!text) return "";
-    
+
     // 1. 移除 HTML 标签
     let clean = text.replace(/<[^>]*>/g, "");
-    
+
     // 2. 统一换行符并去除首尾空白
     clean = clean.replace(/\r\n/g, "\n").trim();
-    
+
     // 3. 截断常见的签名分隔符
     const signatureMarkers = ["------", "---", "-- ", "________________________________", "发自我的 iPhone", "发自我的手机"];
     for (const marker of signatureMarkers) {
@@ -149,7 +152,7 @@ function cleanBodyDynamic(text, sender) {
             sender, // 完整邮箱
             namePart // 邮箱前缀 (如 Hx10)
         ];
-        
+
         for (const pattern of patterns) {
             const index = clean.lastIndexOf(pattern);
             // 如果发件人特征出现在最后 100 个字符内，说明很可能是签名
@@ -171,8 +174,28 @@ function cleanBodyDynamic(text, sender) {
 
 // --- 业务处理函数 ---
 
-async function handleRemail(env, domain) {
-    const prefix = `temp-${generatePart(8)}`;
+async function handleRemail(env, domain, request) {
+    // 尝试从请求参数中获取 prefix，如果不存在则生成类似人名的前缀
+    const requestedPrefix = new URL(request.url).searchParams.get("prefix");
+    let prefix;
+    if (requestedPrefix) {
+        prefix = requestedPrefix;
+    } else {
+        // 如果没有提供，则生成一个类似人名的前缀
+        const firstNames = ["john", "william", "james", "george", "charles", "frank", "joseph", "thomas", "henry", "robert", "edward", "harry", "walter", "paul", "arthur", "albert", "samuel", "harold", "louis", "david", "peter", "patrick", "donald", "kenneth", "gary", "larry", "stephen", "jeffrey", "mark", "kevin", "brian", "ronald", "anthony", "eric", "jason", "justin", "scott", "daniel", "matthew", "ryan", "nicholas", "jacob", "michael", "christopher", "joshua", "andrew", "ethan", "jose", "alexander", "tyler", "brandon", "zachary", "maria", "susan", "linda", "margaret", "elizabeth", "dorothy", "helen", "nancy", "betty", "sandra", "carol", "patricia", "barbara", "mary", "jennifer", "lisa", "michelle", "kimberly", "amy", "melissa", "angela", "stephanie", "rebecca", "sharon", "laura", "deborah", "cynthia", "kathleen", "amanda", "heather", "nicole", "sarah", "christina", "erin", "rachel", "megan", "lauren", "victoria", "samantha", "jasmine", "olivia", "emma", "ava"];
+        const lastNames = ["smith", "johnson", "williams", "jones", "brown", "davis", "miller", "wilson", "moore", "taylor", "anderson", "thomas", "jackson", "white", "harris", "martin", "thompson", "garcia", "martinez", "robinson", "clark", "rodriguez", "lewis", "lee", "walker", "hall", "allen", "young", "hernandez", "king", "wright", "lopez", "hill", "scott", "green", "adams", "baker", "gonzalez", "nelson", "carter", "mitchell", "perez", "roberts", "turner", "phillips", "campbell", "parker", "evans", "edwards", "collins", "stewart", "sanchez", "morris", "rogers", "reed", "cook", "morgan", "bell", "murphy", "bailey", "rivera", "cooper", "richardson", "cox", "howard", "ward", "torres", "peterson", "gray", "ramirez", "james", "watson", "brooks", "kelly", "sanders", "price", "bennett", "wood", "barnes", "ross", "henderson", "coleman", "jenkins", "perry", "powell", "long", "patterson", "hughes"];
+
+        const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+
+        if (Math.random() < 0.7) { // 70% 的概率添加数字后缀
+            const num = Math.floor(Math.random() * 90) + 10; // 10-99
+            prefix = `${first}.${last}${num}`;
+        } else {
+            prefix = `${first}.${last}`;
+        }
+    }
+
     const email = `${prefix}@${domain}`;
     const mailboxId = generateMailboxId();
     await env.DB.prepare("INSERT INTO mailboxes (id, email, prefix) VALUES (?, ?, ?)").bind(mailboxId, email, prefix).run();
@@ -188,9 +211,9 @@ async function handleGetMail(env, mailId, mailboxId) {
     let mail;
     if (mailId) mail = await env.DB.prepare("SELECT * FROM mails WHERE id = ?").bind(mailId).first();
     if (!mail && mailboxId) mail = await env.DB.prepare("SELECT * FROM mails WHERE mailbox_id = ? ORDER BY created_at DESC LIMIT 1").bind(mailboxId).first();
-    
+
     if (!mail) return new Response(JSON.stringify({ error: "邮件不存在" }), { status: 404, headers: { "Content-Type": "application/json" } });
-    
+
     let contentObj = { subject: "无主题", text: "无内容" };
     try {
         contentObj = JSON.parse(mail.content);
@@ -203,7 +226,7 @@ async function handleGetMail(env, mailId, mailboxId) {
         id: mail.id,
         sender: mail.sender_name,
         subject: contentObj.subject,
-        body: cleanedBody, 
+        body: cleanedBody,
         time: new Date(mail.created_at * 1000).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
     }), { headers: { "Content-Type": "application/json" } });
 }
