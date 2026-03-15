@@ -15,6 +15,41 @@
 - **灵活的 API 接口**：提供创建邮箱、查看收件箱、获取邮件内容等 API。
 - **API 兼容性**：`/api/mail` 接口同时支持 `mail_id` 和 `mailbox_id` 查询，当传入 `mailbox_id` 时，自动返回该邮箱下最新的一封邮件。
 
+## 🤖 自动化注册脚本 (OpenAI)
+
+本项目包含一个强大的自动化脚本 `openai_regst_auto.py`，可配合 Temp Mail 服务实现 OpenAI 账号的自动注册与验证码提取。
+
+### 1. 脚本特性
+- **自动创建邮箱**：调用 Temp Mail API 自动生成注册邮箱。
+- **自动提取验证码**：实时轮询收件箱，精准提取 OpenAI 注册邮件中的 6 位数字验证码。
+- **全流程自动化**：从提交注册表单到完成邮箱验证，无需人工干预。
+- **灵活配置**：支持通过 `.env` 文件或环境变量进行配置。
+
+### 2. 快速开始
+1. **安装依赖**：
+   ```bash
+   pip install curl_cffi
+   ```
+2. **配置 `.env` 文件**：
+   在脚本同级目录下创建 `.env` 文件，参考以下范本：
+   ```env
+   # Temp Mail Worker 地址 (末尾不需要斜杠)
+   TEMP_MAIL_WORKER=https://your-worker.workers.dev
+   # API 访问密钥 (与 Worker 中的 JWT_KEY 一致)
+   JWT_KEY=admin123
+   # 您的邮箱域名后缀
+   MAIL_DOMAIN=yourdomain.com
+   
+   # 可选配置
+   OPENAI_SSL_VERIFY=1
+   SKIP_NET_CHECK=0
+   TOKEN_OUTPUT_DIR=./tokens
+   ```
+3. **运行脚本**：
+   ```bash
+   python openai_regst_auto.py --proxy http://your-proxy-address
+   ```
+
 ## 🛠️ 部署步骤
 
 ### 1. 创建 D1 数据库
@@ -103,5 +138,5 @@ CREATE TABLE IF NOT EXISTS mails (
 
 **Author**: [zzusec](https://github.com/zzusec)
 **Reference**: [mail-curl](https://github.com/s12ryt/mail-curl)
-**Version**: 1.0.0
+**Version**: 1.1.0
 **Date**: 2026-03-15
