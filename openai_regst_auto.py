@@ -69,13 +69,54 @@ def _skip_net_check() -> bool:
     flag = os.getenv("SKIP_NET_CHECK", "0").strip().lower()
     return flag in {"1", "true", "yes", "on"}
 
+# 常用英文名和姓氏列表
+FIRST_NAMES = [
+    "john", "william", "james", "george", "charles", "frank", "joseph", "thomas",
+    "henry", "robert", "edward", "harry", "walter", "paul", "arthur", "albert",
+    "samuel", "harold", "louis", "david", "peter", "patrick", "donald", "kenneth",
+    "gary", "larry", "stephen", "jeffrey", "mark", "kevin", "brian", "ronald",
+    "anthony", "eric", "jason", "justin", "scott", "daniel", "matthew", "ryan",
+    "nicholas", "jacob", "michael", "christopher", "joshua", "andrew", "ethan",
+    "jose", "alexander", "tyler", "brandon", "zachary", "maria", "susan", "linda",
+    "margaret", "elizabeth", "dorothy", "helen", "nancy", "betty", "sandra", "carol",
+    "patricia", "barbara", "mary", "jennifer", "lisa", "michelle", "kimberly", "amy",
+    "melissa", "angela", "stephanie", "rebecca", "sharon", "laura", "deborah", "cynthia",
+    "kathleen", "amanda", "heather", "nicole", "sarah", "christina", "erin", "rachel",
+    "megan", "lauren", "victoria", "samantha", "jasmine", "olivia", "emma", "ava"
+]
+
+LAST_NAMES = [
+    "smith", "johnson", "williams", "jones", "brown", "davis", "miller", "wilson",
+    "moore", "taylor", "anderson", "thomas", "jackson", "white", "harris", "martin",
+    "thompson", "garcia", "martinez", "robinson", "clark", "rodriguez", "lewis", "lee",
+    "walker", "hall", "allen", "young", "hernandez", "king", "wright", "lopez",
+    "hill", "scott", "green", "adams", "baker", "gonzalez", "nelson", "carter",
+    "mitchell", "perez", "roberts", "turner", "phillips", "campbell", "parker", "evans",
+    "edwards", "collins", "stewart", "sanchez", "morris", "rogers", "reed", "cook",
+    "morgan", "bell", "murphy", "bailey", "rivera", "cooper", "richardson", "cox",
+    "howard", "ward", "torres", "peterson", "gray", "ramirez", "james", "watson",
+    "brooks", "kelly", "sanders", "price", "bennett", "wood", "barnes", "ross",
+    "henderson", "coleman", "jenkins", "perry", "powell", "long", "patterson", "hughes"
+]
+
+def _generate_email_prefix() -> str:
+    """生成类似真实人名的邮箱前缀"""
+    first = random.choice(FIRST_NAMES)
+    last = random.choice(LAST_NAMES)
+    # 随机决定是否添加数字后缀以增加唯一性
+    if random.random() < 0.7: # 70% 的概率添加数字
+        num = random.randint(10, 99)
+        return f"{first}.{last}{num}"
+    return f"{first}.{last}"
+
 def get_email_and_token(proxies: Any = None) -> tuple:
     """调用 Temp Mail API 创建新邮箱"""
-    print(f"[*] 正在通过 Worker 创建新邮箱 (域名: {MAIL_DOMAIN})...")
+    prefix = _generate_email_prefix()
+    print(f"[*] 正在通过 Worker 创建新邮箱 (前缀: {prefix}, 域名: {MAIL_DOMAIN})...")
     try:
         res = requests.get(
             f"{TEMP_MAIL_WORKER}/api/remail",
-            params={"key": JWT_KEY, "domain": MAIL_DOMAIN},
+            params={"key": JWT_KEY, "domain": MAIL_DOMAIN, "prefix": prefix},
             proxies=proxies,
             impersonate="safari",
             verify=_ssl_verify(),
@@ -425,8 +466,8 @@ def run(proxy: Optional[str]) -> tuple:
         resp = s.get(url, proxies=proxies, verify=True, timeout=15)
         did = s.cookies.get("oai-did")
         print(f"[*] Device ID: {did}")
-        signup_body = f\'{{"username":{{"value":"{email}","kind":"email"}},"screen_hint":"signup"}}\'
-        sen_req_body = f\'{{"p":"","id":"{did}","flow":"authorize_continue"}}\'
+        signup_body = f\"{{\"username\":{{\"value\":\"{email}\",\"kind\":\"email\"}},\"screen_hint\":\"signup\"}}\"
+        sen_req_body = f\"{{\"p\":\"\",\"id\":\"{did}\",\"flow\":\"authorize_continue\"}}\"
         sen_resp = requests.post(
             "https://sentinel.openai.com/backend-api/sentinel/req",
             headers={
@@ -444,7 +485,7 @@ def run(proxy: Optional[str]) -> tuple:
             print(f"[Error] Sentinel 异常拦截，状态码: {sen_resp.status_code}")
             return None, None
         sen_token = sen_resp.json()["token"]
-        sentinel = f\'{{"p": "", "t": "", "c": "{sen_token}", "id": "{did}", "flow": "authorize_continue"}}\'
+        sentinel = f\"{{\"p\": \"\", \"t\": \"\", \"c\": \"{sen_token}\", \"id\": \"{did}\", \"flow\": \"authorize_continue\"}}\"
         signup_resp = s.post(
             "https://auth.openai.com/api/accounts/authorize/continue",
             headers={
@@ -547,7 +588,7 @@ def run(proxy: Optional[str]) -> tuple:
         else:
             print("[*] 密码注册无需邮箱验证，跳过 OTP 步骤")
 
-        create_account_body = \'{"name":"Neo","birthdate":"2000-02-20"}\'
+        create_account_body = \"{\"name\":\"Neo\",\"birthdate\":\"2000-02-20\"}\"
         print("[*] 开始创建账户...")
         create_account_resp = _post_with_retry(
             s,
@@ -577,7 +618,7 @@ def run(proxy: Optional[str]) -> tuple:
             return None, None
         workspace_id = str((workspaces[0] or {}).get("id") or "").strip()
         
-        select_body = f\'{{"workspace_id":"{workspace_id}"}}\'
+        select_body = f\"{{\"workspace_id\":\"{workspace_id}\"}}\"
         print("[*] 开始选择 workspace...")
         select_resp = _post_with_retry(
             s,
@@ -643,7 +684,7 @@ def main() -> None:
 
     while True:
         count += 1
-        print(f"\n[{datetime.now().strftime(\'%H:%M:%S\')}] >>> 开始第 {count} 次注册流程 <<<")
+        print(f"\n[{datetime.now().strftime(\"%H:%M:%S\")}] >>> 开始第 {count} 次注册流程 <<<")
         try:
             token_json, password = run(args.proxy)
             if token_json == "retry_403":
