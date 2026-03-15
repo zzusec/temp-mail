@@ -36,7 +36,7 @@ def _load_dotenv(path: str = ".env") -> None:
                 if not key or key in os.environ:
                     continue
                 value = value.strip()
-                if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\"", "\""}:
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\"", "'"}:
                     value = value[1:-1]
                 os.environ[key] = value
     except Exception:
@@ -373,7 +373,7 @@ def submit_callback_url(
     cb = _parse_callback_url(callback_url)
     if cb["error"]:
         desc = cb["error_description"]
-        raise RuntimeError(f"oauth error: {cb[\'error\']}: {desc}".strip())
+        raise RuntimeError(f'oauth error: {cb["error"]}: {desc}'.strip())
     if not cb["code"]:
         raise ValueError("callback url missing ?code=")
     if not cb["state"]:
@@ -466,8 +466,15 @@ def run(proxy: Optional[str]) -> tuple:
         resp = s.get(url, proxies=proxies, verify=True, timeout=15)
         did = s.cookies.get("oai-did")
         print(f"[*] Device ID: {did}")
-        signup_body = f\"{{\"username\":{{\"value\":\"{email}\",\"kind\":\"email\"}},\"screen_hint\":\"signup\"}}\"
-        sen_req_body = f\"{{\"p\":\"\",\"id\":\"{did}\",\"flow\":\"authorize_continue\"}}\"
+        
+        # 使用 json.dumps 构造 signup_body
+        signup_body_dict = {"username": {"value": email, "kind": "email"}, "screen_hint": "signup"}
+        signup_body = json.dumps(signup_body_dict)
+
+        # 使用 json.dumps 构造 sen_req_body
+        sen_req_body_dict = {"p": "", "id": did, "flow": "authorize_continue"}
+        sen_req_body = json.dumps(sen_req_body_dict)
+
         sen_resp = requests.post(
             "https://sentinel.openai.com/backend-api/sentinel/req",
             headers={
@@ -485,7 +492,11 @@ def run(proxy: Optional[str]) -> tuple:
             print(f"[Error] Sentinel 异常拦截，状态码: {sen_resp.status_code}")
             return None, None
         sen_token = sen_resp.json()["token"]
-        sentinel = f\"{{\"p\": \"\", \"t\": \"\", \"c\": \"{sen_token}\", \"id\": \"{did}\", \"flow\": \"authorize_continue\"}}\"
+        
+        # 使用 json.dumps 构造 sentinel
+        sentinel_dict = {"p": "", "t": "", "c": sen_token, "id": did, "flow": "authorize_continue"}
+        sentinel = json.dumps(sentinel_dict)
+
         signup_resp = s.post(
             "https://auth.openai.com/api/accounts/authorize/continue",
             headers={
@@ -588,7 +599,7 @@ def run(proxy: Optional[str]) -> tuple:
         else:
             print("[*] 密码注册无需邮箱验证，跳过 OTP 步骤")
 
-        create_account_body = \"{\"name\":\"Neo\",\"birthdate\":\"2000-02-20\"}\"
+        create_account_body = json.dumps({"name":"Neo","birthdate":"2000-02-20"})
         print("[*] 开始创建账户...")
         create_account_resp = _post_with_retry(
             s,
@@ -618,7 +629,10 @@ def run(proxy: Optional[str]) -> tuple:
             return None, None
         workspace_id = str((workspaces[0] or {}).get("id") or "").strip()
         
-        select_body = f\"{{\"workspace_id\":\"{workspace_id}\"}}\"
+        # 使用 json.dumps 构造 select_body
+        select_body_dict = {"workspace_id": workspace_id}
+        select_body = json.dumps(select_body_dict)
+
         print("[*] 开始选择 workspace...")
         select_resp = _post_with_retry(
             s,
@@ -684,7 +698,7 @@ def main() -> None:
 
     while True:
         count += 1
-        print(f"\n[{datetime.now().strftime(\"%H:%M:%S\")}] >>> 开始第 {count} 次注册流程 <<<")
+        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] >>> 开始第 {count} 次注册流程 <<<")
         try:
             token_json, password = run(args.proxy)
             if token_json == "retry_403":
@@ -693,7 +707,7 @@ def main() -> None:
             if token_json:
                 t_data = json.loads(token_json)
                 account_email = t_data.get("email", "")
-                file_name = f"token_{account_email.replace(\'@\', \'_\')}_{int(time.time())}.json"
+                file_name = f"token_{account_email.replace('@', '_')}_{int(time.time())}.json"
                 if TOKEN_OUTPUT_DIR:
                     os.makedirs(TOKEN_OUTPUT_DIR, exist_ok=True)
                     file_name = os.path.join(TOKEN_OUTPUT_DIR, file_name)
