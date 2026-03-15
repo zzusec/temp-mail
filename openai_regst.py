@@ -51,7 +51,7 @@ def _load_dotenv(path: str = ".env") -> None:
 
 _load_dotenv()
 
-MAIL_DOMAIN = "corp.llkan.com"
+MAIL_DOMAIN = "domain.com"
 TOKEN_OUTPUT_DIR = os.getenv("TOKEN_OUTPUT_DIR", "").strip()
 
 
