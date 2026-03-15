@@ -28,9 +28,6 @@ from curl_cffi import requests
 
 # 请在此处配置您的 Worker 地址和 JWT_KEY
 # 也可以通过环境变量 TEMP_MAIL_WORKER 和 JWT_KEY 设置
-TEMP_MAIL_WORKER = os.getenv("TEMP_MAIL_WORKER").rstrip("/") if os.getenv("TEMP_MAIL_WORKER") else "https://your-worker.workers.dev"
-JWT_KEY = os.getenv("JWT_KEY") if os.getenv("JWT_KEY") else "admin123"
-
 def _load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
         return
@@ -52,6 +49,9 @@ def _load_dotenv(path: str = ".env") -> None:
         pass
 
 _load_dotenv()
+
+TEMP_MAIL_WORKER = os.getenv("TEMP_MAIL_WORKER").rstrip("/") if os.getenv("TEMP_MAIL_WORKER") else "https://your-worker.workers.dev"
+JWT_KEY = os.getenv("JWT_KEY") if os.getenv("JWT_KEY") else "admin123"
 
 # 自动从 index.js 或环境变量获取域名
 def get_mail_domain():
