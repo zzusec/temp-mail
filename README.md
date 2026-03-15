@@ -14,13 +14,14 @@
   - **动态去噪**：智能识别并剔除邮件正文末尾的签名档（包括常见的 `------`、`发自我的 iPhone` 等，以及根据发件人信息动态匹配的签名）。
 - **灵活的 API 接口**：提供创建邮箱、查看收件箱、获取邮件内容等 API。
 - **API 兼容性**：`/api/mail` 接口同时支持 `mail_id` 和 `mailbox_id` 查询，当传入 `mailbox_id` 时，自动返回该邮箱下最新的一封邮件。
+- **人名邮箱生成**：支持生成类似 `john.smith@yourdomain.com` 的人名邮箱，而非简单的 `temp-xxxx` 格式。
 
 ## 🤖 自动化注册脚本 (OpenAI)
 
 本项目包含一个强大的自动化脚本 `openai_regst_auto.py`，可配合 Temp Mail 服务实现 OpenAI 账号的自动注册与验证码提取。
 
 ### 1. 脚本特性
-- **自动创建邮箱**：调用 Temp Mail API 自动生成注册邮箱。
+- **自动创建邮箱**：调用 Temp Mail API 自动生成注册邮箱，支持人名邮箱前缀。
 - **自动提取验证码**：实时轮询收件箱，精准提取 OpenAI 注册邮件中的 6 位数字验证码。
 - **全流程自动化**：从提交注册表单到完成邮箱验证，无需人工干预。
 - **灵活配置**：支持通过 `.env` 文件或环境变量进行配置。
@@ -31,13 +32,13 @@
    pip install curl_cffi
    ```
 2. **配置 `.env` 文件**：
-   在脚本同级目录下创建 `.env` 文件，参考以下范本：
+   在脚本同级目录下创建 `.env` 文件，参考以下范本。**请务必将 `MAIL_DOMAIN` 设置为您的实际域名，并确保 `TEMP_MAIL_WORKER` 和 `JWT_KEY` 配置正确。**
    ```env
    # Temp Mail Worker 地址 (末尾不需要斜杠)
    TEMP_MAIL_WORKER=https://your-worker.workers.dev
    # API 访问密钥 (与 Worker 中的 JWT_KEY 一致)
    JWT_KEY=admin123
-   # 您的邮箱域名后缀
+   # 您的邮箱域名后缀 (例如：hx10.com)
    MAIL_DOMAIN=yourdomain.com
    
    # 可选配置
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS mails (
 ### 2. 创建 Worker 服务
 1. 导航到 **Workers & Pages** -> **“创建应用程序”** -> **“创建 Worker”**。
 2. 输入服务名称（例如 `temp-mail-worker`）并点击 **“部署”**。
-3. 进入 Worker 服务，点击 **“编辑代码”**，将本项目提供的 `index.js` 内容全量覆盖并保存部署。
+3. 进入 Worker 服务，点击 **“编辑代码”**，将本项目提供的 `index.js` 内容全量覆盖并保存部署。**请确保您部署的是最新版本，它支持自定义邮箱前缀。**
 
 ### 3. 配置环境变量与绑定
 在 Worker 服务的 **“设置”** -> **“变量”** 中进行配置：
@@ -105,8 +106,9 @@ CREATE TABLE IF NOT EXISTS mails (
 ### 1. 创建/刷新邮箱
 - **方法**：`GET`
 - **路径**：`/api/remail`
-- **参数**：`key` (必填), `domain` (可选)
-- **示例**：`https://yourworker.yourdomain.com/api/remail?key=admin123`
+- **参数**：`key` (必填), `domain` (可选), `prefix` (可选，自定义邮箱前缀，例如 `john.smith`)
+- **说明**：如果提供了 `prefix` 参数，Worker 将尝试使用该前缀创建邮箱。如果未提供，Worker 将自动生成类似人名的前缀。
+- **示例**：`https://yourworker.yourdomain.com/api/remail?key=admin123&prefix=john.doe`
 
 ### 2. 查看收件箱列表
 - **方法**：`GET`
@@ -138,5 +140,5 @@ CREATE TABLE IF NOT EXISTS mails (
 
 **Author**: [zzusec](https://github.com/zzusec)
 **Reference**: [mail-curl](https://github.com/s12ryt/mail-curl)
-**Version**: 1.1.0
+**Version**: 1.2.0
 **Date**: 2026-03-15
